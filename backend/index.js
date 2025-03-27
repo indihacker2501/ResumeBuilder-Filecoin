@@ -1,8 +1,9 @@
+// backend/index.js
 import express from "express";
 import cors from "cors";
 import bodyParser from "body-parser";
 import { OpenAI } from "openai";
-import dotenv from "dotenv"
+import dotenv from "dotenv";
 
 dotenv.config();
 
@@ -13,13 +14,33 @@ app.use(cors());
 app.use(bodyParser.json());
 
 const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY, // Add your OpenAI API key in the .env file
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
 app.post("/generate-resume", async (req, res) => {
-  const { name, phone, email, education, educationDuration, experience, experienceDuration, github, linkedin, skills, jobDescription, role, company, certifications, certificationDate, portfolio, projects } = req.body;
-
   try {
+    const { 
+      name, phone, email, linkedin, github, portfolio,
+      education, educationDuration, university, graduationYear,
+      experience, experienceDuration, companyName, role,
+      jobDescription, skills, certifications, certificationDate,
+      achievements, awards, languages,
+      projects 
+    } = req.body;
+
+    const formattedProjects = Array.isArray(projects) && projects.every(p => typeof p === 'object') ? projects : [];
+
+    const projectSummaries = await Promise.all(
+      formattedProjects.map(async (project) => {
+        if (project.description) {
+          const summary = await generateProjectSummary(project.description);
+          return `- ${project.name} (${project.techStack}) | [Live](${project.liveLink})\n  Summary: ${summary}`;
+        } else {
+          return `- ${project.name} (${project.techStack}) | [Live](${project.liveLink})\n  Summary: No description provided.`;
+        }
+      })
+    );
+
     const response = await openai.chat.completions.create({
       model: "gpt-4",
       messages: [
@@ -30,10 +51,9 @@ app.post("/generate-resume", async (req, res) => {
         {
           role: "user",
           content: `
-          Write a tailored resume for a ${role} role at ${company}. 
-          Include a professional summary that highlights key skills and achievements relevant to the ${jobDescription}.
-          
-          Personal Details:
+          Write a tailored resume for a ${role} role at ${companyName} according to the ${jobDescription}. (Reminder: Don't add any skills keep the skills as entered by user you just format it)
+
+          **Personal Details:**
           - Name: ${name}
           - Phone: ${phone}
           - Email: ${email}
@@ -41,27 +61,27 @@ app.post("/generate-resume", async (req, res) => {
           - GitHub: ${github}
           - Portfolio: ${portfolio}
 
-          Education:
-          ${education} (${educationDuration})
+          **Education:**
+          - ${education}, ${university} (${educationDuration} years, Graduated: ${graduationYear})
 
-          Experience:
-          ${experience} ${experienceDuration ? `(${experienceDuration})` : ""}
+          **Experience:**
+          - ${experience} (${experienceDuration} years) at ${companyName}
 
-          Skills:
-          ${skills}
+          **Skills:**
+          - ${skills}
 
-          ${certifications ? `Certifications:
-          ${certifications} (${certificationDate})` : ""}
+          **Certifications:**
+          - ${certifications} (${certificationDate})
 
-          Projects:
-          ${projects ? projects.map(project => `- ${project.name}: ${project.techStack} | [Live](${project.liveLink})
-  Summary:
-  - ${generateProjectSummary(project.description)}`).join('\n') : ""}
+          **Projects:**
+          ${projectSummaries.length > 0 ? projectSummaries.join("\n") : "No projects listed."}
 
-          Tailor the experience section with 3-5 bullet points per role, showcasing impact using metrics where possible. 
-          If applicable, incorporate internships, projects, or coursework for freshers. 
-          Ensure the most relevant keywords from the job description are integrated throughout. 
-          Do not include an objective statement or references.
+          **Achievements & Awards:**
+          - ${achievements || "Not provided"}
+          - ${awards || "Not provided"}
+
+          **Languages:**
+          - ${languages || "Not provided"}
           `,
         },
       ],
@@ -81,7 +101,7 @@ async function generateProjectSummary(description) {
       messages: [
         {
           role: "system",
-          content: "Summarize the following project description in under 30 words in bullet points:",
+          content: "Summarize the following project description in under 30 words:",
         },
         {
           role: "user",
@@ -97,5 +117,5 @@ async function generateProjectSummary(description) {
 }
 
 app.listen(port, () => {
-  console.log(`Server running on http://localhost:${port}`);
+  console.log(`🚀 Server running on http://localhost:${port}`);
 });
