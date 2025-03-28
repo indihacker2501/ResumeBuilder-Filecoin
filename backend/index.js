@@ -4,11 +4,15 @@ import cors from "cors";
 import bodyParser from "body-parser";
 import { OpenAI } from "openai";
 import dotenv from "dotenv";
+import fs from 'fs'
+import axios from 'axios';
+import PDFDocument from "pdfkit";
+import FormData from "form-data";
 
 dotenv.config();
 
 const app = express();
-const port = 8000;
+const port = 3000;
 
 app.use(cors());
 app.use(bodyParser.json());
@@ -19,13 +23,13 @@ const openai = new OpenAI({
 
 app.post("/generate-resume", async (req, res) => {
   try {
-    const { 
+    const {
       name, phone, email, linkedin, github, portfolio,
       education, educationDuration, university, graduationYear,
       experience, experienceDuration, companyName, role,
       jobDescription, skills, certifications, certificationDate,
       achievements, awards, languages,
-      projects 
+      projects
     } = req.body;
 
     const formattedProjects = Array.isArray(projects) && projects.every(p => typeof p === 'object') ? projects : [];
@@ -86,13 +90,63 @@ app.post("/generate-resume", async (req, res) => {
         },
       ],
     });
+    //file
 
-    res.json({ resume: response.choices[0].message.content });
+    //upload
+
+    //file delete
+
+    const generatedResume = response.choices[0].message.content;
+
+    // Save resume to a PDF file
+    const timestamp = Date.now();
+    const filePath = `./uploads/resume_${timestamp}.pdf`;
+    
+    const doc = new PDFDocument();
+    const writeStream = fs.createWriteStream(filePath);
+    doc.pipe(writeStream);
+
+    doc.fontSize(14).text(generatedResume, { align: 'left' });
+
+    doc.end();
+
+    writeStream.on("finish", async () => {
+      // Upload file to Akave
+      const uploadedFile = await uploadFileToAkave("Resume", filePath);
+
+      // Remove local PDF file after upload
+      fs.unlinkSync(filePath);
+
+      // Return both resume content & uploaded file URL
+      res.json({
+        resume: generatedResume,
+        fileUrl: uploadedFile,
+      });
+    });
   } catch (error) {
     console.error("Error generating resume:", error);
     res.status(500).json({ error: "Failed to generate resume" });
   }
 });
+
+async function uploadFileToAkave(bucketName, filePath) {
+  const form = new FormData();
+  form.append("file", fs.createReadStream(filePath));
+
+  try {
+    const response = await axios.post(
+      `http://localhost:8000/buckets/${bucketName}/files`,
+      form,
+      {
+        headers:form.getHeaders()
+      }
+    );
+    console.log("response from upload akave: ",response.data)
+    return response.data; // Return file URL after upload
+  } catch (error) {
+    console.error("Error uploading file to Akave:", error.message);
+  }
+}
 
 async function generateProjectSummary(description) {
   try {

@@ -5,6 +5,8 @@ import jsPDF from "jspdf";
 
 function App() {
   const [resume, setResume] = useState("");
+  const [resumeUrl, setResumeUrl] = useState("");
+  const [fileName,setFileName]=useState("")
   const [formData, setFormData] = useState({
     name: "Rakesh",
     phone: "23424324",
@@ -36,45 +38,57 @@ function App() {
 
   const generateResume = async () => {
     try {
-      const response = await axios.post("http://localhost:8000/generate-resume", formData);
+      const response = await axios.post("http://localhost:3000/generate-resume", formData);
+      console.log("Response fileurl: ", response);
+      setFileName(response.data.fileUrl.data.Name)
       setResume(response.data.resume);
-      // downloadPDF(response.data.resume);
+      // setResumeUrl(response.data.fileUrl);
     } catch (error) {
       console.error("Error generating resume:", error);
     }
   };
 
-  const downloadPDF = (generatedResume) => {
-    if (typeof generatedResume !== "string") {
-      console.error("Invalid resume format:", generatedResume);
-      return;
-    }
-  
-    const doc = new jsPDF();
-    doc.setFont("helvetica");
-    doc.setFontSize(14);
-    doc.text("Resume", 105, 10, null, null, "center");
-  
-    let y = 20;
-    const maxWidth = 180; // Set max width to fit within the page
-    
-    const resumeLines = generatedResume.split("\n");
-  
-    resumeLines.forEach(line => {
-      const wrappedText = doc.splitTextToSize(line, maxWidth); // Wrap text
-      wrappedText.forEach(textLine => {
-        if (y > 280) { // Page limit check
-          doc.addPage();
-          y = 20;
+  // async function downloadFile(bucketName, fileName, outputDir) {
+  //   try {
+  //     const response = await axios.get(`http://localhost:8000/buckets/${bucketName}/files/${fileName}/download`, {
+  //       responseType: 'blob',
+  //     });
+  //     console.log(`File downloaded: ${fileName}`);
+  //     // fs.writeFileSync(`./${outputDir}/${fileName}`, response.data);
+  //   } catch (error) {
+  //     console.error(error.response ? error.response.data : error.message);
+  //   }
+  // }
+
+  async function downloadFile(bucketName, fileName) {
+    try {
+      const response = await axios.get(
+        `http://localhost:8000/buckets/${bucketName}/files/${fileName}/download`,
+        {
+          responseType: 'blob', // Important for handling binary data
         }
-        doc.text(textLine, 10, y);
-        y += 7;
-      });
-    });
-  
-    doc.save("resume.pdf");
-  };
-  
+      );
+
+      // Create a blob URL from the response data
+      const blob = new Blob([response.data]);
+      const url = window.URL.createObjectURL(blob);
+
+      // Create a temporary link element for downloading
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = fileName || 'resume.pdf'; // Fallback filename if fileName is empty
+      document.body.appendChild(link);
+      link.click();
+
+      // Cleanup
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+
+      console.log(`File downloaded: ${fileName}`);
+    } catch (error) {
+      console.error("Download error:", error.response ? error.response.data : error.message);
+    }
+  }
 
   return (
     <div style={{ maxWidth: "600px", margin: "auto", padding: "20px" }}>
@@ -91,21 +105,25 @@ function App() {
         />
       ))}
       <button onClick={generateResume} style={{ marginTop: "10px" }}>Generate Resume</button>
-      <button onClick={() => downloadPDF(resume)} style={{ marginTop: "10px", marginLeft: "10px" }}>Download PDF</button>
-      {resume && (
-  <div style={{
-    background: "#f4f4f4",
-    padding: "10px",
-    color: "black",
-    whiteSpace: "pre-wrap", // Ensures text wraps properly
-    wordWrap: "break-word", // Breaks long words
-    overflowWrap: "break-word", // Alternative for extra safety
-    maxWidth: "100%", // Ensures it doesn't overflow
-  }}>
-    {resume}
-  </div>
-)}
 
+        <div>
+          <p>🔗 <a href={resumeUrl} target="_blank" rel="noopener noreferrer">Download Resume from Akave</a></p>
+          <button onClick={()=>downloadFile("Resume",fileName,"./downloadedFiles")} style={{ marginTop: "10px" }}>Download Resume</button>
+        </div>
+
+      {resume && (
+        <div style={{
+          background: "#f4f4f4",
+          padding: "10px",
+          color: "black",
+          whiteSpace: "pre-wrap",
+          wordWrap: "break-word",
+          overflowWrap: "break-word",
+          maxWidth: "100%",
+        }}>
+          {resume}
+        </div>
+      )}
     </div>
   );
 }

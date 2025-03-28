@@ -336,7 +336,7 @@ abstract contract StdCheatsSafe {
             // https://github.com/ava-labs/subnet-evm/blob/47c03fd007ecaa6de2c52ea081596e0a88401f58/precompile/params.go#L18-L59
             vm.assume(addr < address(0x0100000000000000000000000000000000000000) || addr > address(0x01000000000000000000000000000000000000ff));
             vm.assume(addr < address(0x0200000000000000000000000000000000000000) || addr > address(0x02000000000000000000000000000000000000FF));
-            vm.assume(addr < address(0x0300000000000000000000000000000000000000) || addr > address(0x03000000000000000000000000000000000000Ff));
+            vm.assume(addr < address(0x0800000000000000000000000000000000000000) || addr > address(0x08000000000000000000000000000000000000Ff));
         }
         // forgefmt: disable-end
     }
