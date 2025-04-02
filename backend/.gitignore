@@ -1,0 +1,11 @@
+node_modules
+.env
+
+
+
+// Projects:
+          // ${projects ? projects.map(project => `- ${project.name}: ${project.techStack} | [Live](${project.liveLink})
+          
+
+  Summary:
+  - ${generateProjectSummary(project.description)}`).join('\n') : ""}
